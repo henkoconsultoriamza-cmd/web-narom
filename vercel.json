@@ -1,0 +1,17 @@
+{
+  "redirects": [
+    {
+      "source": "/catalogo",
+      "destination": "https://catalogo-distribuidores.vercel.app/catalogo",
+      "permanent": false
+    },
+    {
+      "source": "/catalogo/:path*",
+      "destination": "https://catalogo-distribuidores.vercel.app/catalogo/:path*",
+      "permanent": false
+    }
+  ],
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}

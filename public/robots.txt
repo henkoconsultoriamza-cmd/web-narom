@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://web-narom.vercel.app/sitemap.xml
