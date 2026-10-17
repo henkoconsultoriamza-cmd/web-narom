@@ -2,6 +2,7 @@ import { Swiper, SwiperSlide } from 'swiper/react'
 import { FreeMode } from 'swiper/modules'
 import { motion } from 'framer-motion'
 import { useContent } from '../context/ContentContext'
+import OptimizedImage from './OptimizedImage'
 
 // @ts-ignore
 import 'swiper/css'
@@ -59,7 +60,7 @@ export default function Top10Banner() {
                 <a href={product.url} target="_blank" rel="noopener noreferrer"
                   className="group relative overflow-hidden rounded-xl cursor-pointer block"
                   style={{ height: '280px' }}>
-                  <img src={product.image} alt={product.name}
+                  <OptimizedImage src={product.image} alt={product.name} profile="product" sizes="(max-width: 479px) 80vw, (max-width: 767px) 50vw, 320px"
                     className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
                   <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(2,21,44,0.95) 0%, rgba(2,21,44,0.3) 60%, transparent 100%)' }} />
                   <div className="absolute bottom-0 inset-x-0 p-4">
@@ -71,7 +72,7 @@ export default function Top10Banner() {
               ) : (
                 <div className="group relative overflow-hidden rounded-xl cursor-default"
                   style={{ height: '280px' }}>
-                  <img src={product.image} alt={product.name}
+                  <OptimizedImage src={product.image} alt={product.name} profile="product" sizes="(max-width: 479px) 80vw, (max-width: 767px) 50vw, 320px"
                     className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
                   <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(2,21,44,0.95) 0%, rgba(2,21,44,0.3) 60%, transparent 100%)' }} />
                   <div className="absolute bottom-0 inset-x-0 p-4">

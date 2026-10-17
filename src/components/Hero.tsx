@@ -1,9 +1,14 @@
+import OptimizedImage from './OptimizedImage'
+
 export default function Hero() {
   return (
     <section id="inicio" className="relative h-[100dvh] w-full overflow-hidden">
       {/* Fondo */}
-      <img
+      <OptimizedImage
         src="https://images.unsplash.com/photo-1581244277943-fe4a9c777189?w=1920&q=85"
+        profile="desktop"
+        loading="eager"
+        fetchPriority="high"
         alt=""
         className="anim-fade-in absolute inset-0 h-full w-full object-cover object-center"
       />

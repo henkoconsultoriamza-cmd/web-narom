@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="es">
+<meta charset="utf-8">
+<title>Verificación del proceso de imágenes</title>
+<style>body{font:16px system-ui;max-width:960px;margin:40px auto;padding:0 20px}li{margin:12px 0}.pass{color:#166534}.fail{color:#b91c1c}pre{white-space:pre-wrap}</style>
+<h1>Verificación del proceso de imágenes</h1>
+<p id="status" role="status">Ejecutando pruebas en el navegador…</p>
+<ol id="results"></ol>
+<script type="module">
+import { prepareImage } from '/src/lib/prepare-image.ts'
+import { IMAGE_POLICY, MAX_UPLOAD_BYTES, assertPreparedImage } from '/src/lib/image-policy.ts'
+import { getImageSources } from '/src/lib/images.ts'
+import React, { useEffect, useRef, useState } from 'react'
+import { createRoot } from 'react-dom/client'
+import { ContentProvider, defaultContent, useContent } from '/src/context/ContentContext.tsx'
+import { supabase } from '/src/lib/supabase.ts'
+import { ImageUpload } from '/src/admin/AdminUI.tsx'
+
+const results = document.querySelector('#results')
+let failed = 0
+function assert(value, message) { if (!value) throw new Error(message) }
+async function test(name, run) {
+  const item = document.createElement('li')
+  try { const details = await run(); item.className = 'pass'; item.textContent = `PASS · ${name}${details ? ` · ${details}` : ''}` }
+  catch (error) { failed++; item.className = 'fail'; item.textContent = `FAIL · ${name}: ${error.message}` }
+  results.append(item)
+}
+function blob(canvas, type = 'image/png', quality) {
+  return new Promise((resolve, reject) => canvas.toBlob(value => value ? resolve(value) : reject(new Error('No se pudo crear la muestra')), type, quality))
+}
+async function sample(width, height, noise = false) {
+  const canvas = document.createElement('canvas')
+  canvas.width = width; canvas.height = height
+  const ctx = canvas.getContext('2d')
+  if (noise) {
+    const pixels = ctx.createImageData(width, height)
+    let seed = 12345
+    for (let i = 0; i < pixels.data.length; i += 4) {
+      for (let c = 0; c < 3; c++) { seed = (Math.imul(seed, 1664525) + 1013904223) | 0; pixels.data[i+c] = seed >>> 24 }
+      pixels.data[i+3] = 255
+    }
+    ctx.putImageData(pixels, 0, 0)
+  } else {
+    ctx.fillStyle = '#125cb0'; ctx.fillRect(width * .1, height * .1, width * .8, height * .8)
+    ctx.fillStyle = '#ffca28'; ctx.font = `bold ${Math.round(height * .14)}px sans-serif`
+    ctx.fillText('OFERTA 25%', width * .16, height * .55)
+  }
+  const file = new File([await blob(canvas)], 'banner-prueba.png', { type: 'image/png' })
+  canvas.width = canvas.height = 0
+  return file
+}
+
+const source = await sample(2400, 1200)
+for (const kind of Object.keys(IMAGE_POLICY)) {
+  await test(`${kind}: límite de peso, dimensiones y proporción`, async () => {
+    const prepared = await prepareImage(source, kind)
+    assertPreparedImage(prepared, kind)
+    const image = await createImageBitmap(prepared)
+    const limit = IMAGE_POLICY[kind]
+    assert(prepared.size <= limit.maxBytes, 'Supera el peso permitido')
+    assert(image.width <= limit.maxWidth && image.height <= limit.maxHeight, 'Supera las dimensiones permitidas')
+    assert(Math.abs(image.width / image.height - 2) < .01, 'Se recortó o deformó la imagen')
+    const details = `${image.width} × ${image.height} · ${Math.round(prepared.size / 1024)} KB`
+    image.close()
+    return details
+  })
+}
+await test('Una imagen compleja también respeta el límite', async () => {
+  const prepared = await prepareImage(await sample(1280, 720, true), 'bannerMobile')
+  assert(prepared.size <= IMAGE_POLICY.bannerMobile.maxBytes, 'Se permitió una imagen pesada')
+  return `${Math.round(prepared.size / 1024)} KB`
+})
+await test('Conserva transparencia al redimensionar', async () => {
+  const prepared = await prepareImage(source, 'product')
+  const image = await createImageBitmap(prepared)
+  const canvas = document.createElement('canvas'); canvas.width = image.width; canvas.height = image.height
+  const ctx = canvas.getContext('2d'); ctx.drawImage(image, 0, 0)
+  assert(ctx.getImageData(0, 0, 1, 1).data[3] === 0, 'Se perdió el fondo transparente')
+  image.close()
+})
+await test('No agranda ni recomprime un archivo que ya es adecuado', async () => {
+  const small = await sample(100, 60)
+  const prepared = await prepareImage(small, 'product')
+  assert(prepared === small, 'Se alteró innecesariamente una imagen pequeña')
+})
+for (const [name, file] of [
+  ['archivo vacío', new File([], 'vacio.png', { type: 'image/png' })],
+  ['formato no permitido', new File(['<svg/>'], 'imagen.svg', { type: 'image/svg+xml' })],
+  ['archivo corrupto', new File(['no es una imagen'], 'rota.png', { type: 'image/png' })],
+  ['más de 8 MB', new File([new Uint8Array(MAX_UPLOAD_BYTES + 1)], 'grande.png', { type: 'image/png' })],
+]) {
+  await test(`Rechaza ${name} antes de subir`, async () => {
+    let rejected = false
+    try { await prepareImage(file, 'banner') } catch { rejected = true }
+    assert(rejected, 'Se aceptó un archivo inválido')
+  })
+}
+await test('La barrera previa al upload rechaza archivos que superan el presupuesto', () => {
+  let rejected = false
+  try { assertPreparedImage(new File([new Uint8Array(IMAGE_POLICY.product.maxBytes + 1)], 'pesada.webp', { type: 'image/webp' }), 'product') } catch { rejected = true }
+  assert(rejected, 'El control final permitió subir el original pesado')
+})
+await test('La entrega reconoce una imagen nueva sin depender del nombre del cliente', () => {
+  const src = 'https://test.supabase.co/storage/v1/object/public/narom-images/optimized-v1-banner-12345678-abcd-1234-abcd-123456789abc.webp'
+  assert(getImageSources(src, 'desktop').src === src, 'Reprocesa una imagen que ya está lista')
+  assert(getImageSources(src, 'mobile').src.includes('/render/image/'), 'No ofrece una versión móvil del banner desktop')
+})
+await test('Las imágenes anteriores y futuras tienen alternativas responsive', () => {
+  for (const name of ['antes.png', 'una-imagen-nueva-2099.jpg']) {
+    const image = getImageSources(`https://test.supabase.co/storage/v1/object/public/narom-images/${name}`, 'product')
+    assert(image.src.includes('/render/image/'), 'No optimiza una imagen del CMS')
+    assert(image.srcSet.includes('320w') && image.srcSet.includes('640w'), 'Faltan tamaños responsive')
+  }
+})
+
+// Exercise the real provider against an isolated in-memory backend. These
+// checks never write to the customer's Storage bucket or content row.
+let stored = structuredClone(defaultContent)
+let inFlight = 0, maximumInFlight = 0, failNext = false
+supabase.from = () => ({
+  select: () => ({ eq: () => ({ single: async () => ({ data: { data: structuredClone(stored) }, error: null }) }) }),
+  upsert: async row => {
+    inFlight++; maximumInFlight = Math.max(maximumInFlight, inFlight)
+    await new Promise(resolve => setTimeout(resolve, 20))
+    inFlight--
+    if (failNext) { failNext = false; return { error: new Error('Fallo simulado de guardado') } }
+    stored = structuredClone(row.data)
+    return { error: null }
+  },
+})
+await new Promise(resolve => {
+  const host = document.createElement('div'); document.body.append(host)
+  function PersistenceProbe() {
+    const { content, loading, save } = useContent()
+    const started = useRef(false)
+    useEffect(() => {
+      if (loading || started.current) return
+      started.current = true
+      async function run() {
+        await test('Dos guardados seguidos conservan la imagen y el resto del contenido', async () => {
+          const image = 'https://example.test/nueva-imagen.webp'
+          const promos = content.promos.map((promo, i) => i === 0 ? { ...promo, image } : promo)
+          await Promise.all([
+            save({ contact: { ...content.contact, email: 'prueba@example.test' } }),
+            save({ promos }),
+          ])
+          assert(maximumInFlight === 1, 'Se enviaron escrituras que pueden pisarse entre sí')
+          assert(stored.contact.email === 'prueba@example.test', 'Se perdió el cambio de otra sección')
+          assert(stored.promos[0].image === image, 'Se perdió la imagen nueva')
+        })
+        await test('Un error al guardar no se informa como éxito ni reemplaza el contenido anterior', async () => {
+          const before = JSON.stringify(stored)
+          failNext = true
+          let rejected = false
+          try { await save({ promos: [] }) } catch { rejected = true }
+          assert(rejected, 'No se informó el error')
+          assert(JSON.stringify(stored) === before, 'Se alteró el contenido pese al error')
+        })
+        await test('El cliente puede volver a guardar después de un error', async () => {
+          await save({ contact: { ...stored.contact, email: 'reintento@example.test' } })
+          assert(stored.contact.email === 'reintento@example.test', 'La cola de guardado quedó bloqueada')
+        })
+        resolve()
+      }
+      run()
+    }, [loading, content, save])
+    return null
+  }
+  createRoot(host).render(React.createElement(ContentProvider, null, React.createElement(PersistenceProbe)))
+})
+document.querySelector('#status').textContent = failed ? `${failed} pruebas fallaron` : `${results.children.length} pruebas aprobadas`
+document.body.dataset.result = failed ? 'failed' : 'passed'
+
+let uploaded = null
+supabase.storage.from = () => ({
+  upload: async (path, file, options) => {
+    assertPreparedImage(file, 'banner')
+    uploaded = { path, bytes: file.size, type: file.type, cache: options.cacheControl, upsert: options.upsert, url: URL.createObjectURL(file) }
+    return { error: null }
+  },
+  getPublicUrl: () => ({ data: { publicUrl: uploaded.url } }),
+})
+const uploadHost = document.createElement('div'); document.body.append(uploadHost)
+function UploadProbe() {
+  const { loading, save } = useContent()
+  const [value, setValue] = useState('')
+  const [proof, setProof] = useState('Elegí una imagen para comprobar el recorrido completo sin escribir en el sitio del cliente.')
+  if (loading) return null
+  async function changed(url) {
+    await test('Archivo elegido → preparación → upload → contenido publicado', async () => {
+      assert(uploaded.path.startsWith('optimized-v1-banner-'), 'No se versionó la imagen preparada')
+      assert(uploaded.bytes <= IMAGE_POLICY.banner.maxBytes, 'Se subió el archivo pesado')
+      assert(uploaded.cache === '31536000' && uploaded.upsert === false, 'El reemplazo puede reutilizar una URL anterior')
+      const promos = stored.promos.map((promo, i) => i === 0 ? { ...promo, image: url } : promo)
+      await save({ promos })
+      assert(stored.promos[0].image === url, 'La imagen subida no llegó al contenido del sitio')
+      setValue(url)
+      setProof(JSON.stringify({ ...uploaded, url: 'URL nueva confirmada', published: true }, null, 2))
+    })
+    document.querySelector('#status').textContent = failed ? `${failed} pruebas fallaron` : `${results.children.length} pruebas aprobadas`
+  }
+  return React.createElement('section', null,
+    React.createElement('h2', null, 'Carga desde el panel — backend de prueba aislado'),
+    React.createElement('button', { onClick: async () => {
+      // Generate a large local fixture; no browser file permissions or customer
+      // files are needed to exercise the real input/change/upload handler.
+      setProof('Generando imagen de prueba…')
+      const file = await sample(1280, 720, true)
+      const transfer = new DataTransfer(); transfer.items.add(file)
+      const input = uploadHost.querySelector('input[type="file"]')
+      input.files = transfer.files
+      setProof(`Imagen generada: ${file.size} bytes. Procesando desde el control de carga…`)
+      input.dispatchEvent(new Event('change', { bubbles: true }))
+    } }, 'Probar carga completa con imagen grande'),
+    React.createElement(ImageUpload, { value, onChange: changed, recommended: '1920 × 600 px', imageKind: 'banner' }),
+    React.createElement('pre', { id: 'upload-proof' }, proof),
+  )
+}
+createRoot(uploadHost).render(React.createElement(ContentProvider, null, React.createElement(UploadProbe)))
+</script>
+</html>

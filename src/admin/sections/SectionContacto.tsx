@@ -11,7 +11,11 @@ export default function SectionContacto({ onSave }: { onSave: (msg: string) => v
   useEffect(() => {
     if (!mounted.current) { mounted.current = true; return }
     clearTimeout(timer.current)
-    timer.current = setTimeout(() => { save({ contact: form }); onSave('Contacto guardado') }, 1500)
+    timer.current = setTimeout(() => {
+      save({ contact: form })
+        .then(() => onSave('Contacto guardado'))
+        .catch(() => onSave('No se pudo guardar. Volv? a intentar.'))
+    }, 1500)
     return () => clearTimeout(timer.current)
   }, [JSON.stringify(form)])
 

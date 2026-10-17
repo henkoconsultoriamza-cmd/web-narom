@@ -32,7 +32,11 @@ export default function SectionEmpresa({ onSave }: { onSave: (msg: string) => vo
   useEffect(() => {
     if (!mounted.current) { mounted.current = true; return }
     clearTimeout(timer.current)
-    timer.current = setTimeout(() => { save({ about }); onSave('Empresa guardada') }, 1500)
+    timer.current = setTimeout(() => {
+      save({ about })
+        .then(() => onSave('Empresa guardada'))
+        .catch(() => onSave('No se pudo guardar. Volv? a intentar.'))
+    }, 1500)
     return () => clearTimeout(timer.current)
   }, [JSON.stringify(about)])
 
@@ -66,6 +70,7 @@ export default function SectionEmpresa({ onSave }: { onSave: (msg: string) => vo
         <AdminField label="Foto del depósito / empresa">
           <ImageUpload
             value={about.depotImage}
+            imageKind="company"
             onChange={v => setField('depotImage', v)}
             recommended="800 × 600 px (horizontal)"
             aspect="landscape"

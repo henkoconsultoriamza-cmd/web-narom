@@ -19,7 +19,11 @@ export default function SectionMarcas({ onSave }: { onSave: (msg: string) => voi
   useEffect(() => {
     if (!mounted.current) { mounted.current = true; return }
     clearTimeout(timer.current)
-    timer.current = setTimeout(() => { save({ brands }); onSave('Marcas guardadas') }, 1500)
+    timer.current = setTimeout(() => {
+      save({ brands })
+        .then(() => onSave('Marcas guardadas'))
+        .catch(() => onSave('No se pudo guardar. Volv? a intentar.'))
+    }, 1500)
     return () => clearTimeout(timer.current)
   }, [JSON.stringify(brands)])
 

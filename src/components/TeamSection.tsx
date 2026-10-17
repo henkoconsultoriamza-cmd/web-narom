@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion'
 import { useContent } from '../context/ContentContext'
+import OptimizedImage from './OptimizedImage'
 
 export default function TeamSection() {
   const { content } = useContent()
@@ -45,8 +46,10 @@ export default function TeamSection() {
                   className="relative overflow-hidden rounded-full"
                   style={{ width: 'clamp(110px, 14vw, 160px)', height: 'clamp(110px, 14vw, 160px)' }}
                 >
-                  <img
+                  <OptimizedImage
                     src={persona.foto}
+                    profile="portrait"
+                    sizes="160px"
                     alt={persona.nombre}
                     className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-110"
                   />

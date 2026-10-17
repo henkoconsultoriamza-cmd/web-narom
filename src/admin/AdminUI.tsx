@@ -1,6 +1,9 @@
 import { useState } from 'react'
 import type { ReactNode, CSSProperties } from 'react'
 import { supabase } from '../lib/supabase'
+import { prepareImage } from '../lib/prepare-image'
+import { assertPreparedImage } from '../lib/image-policy'
+import type { ImageKind } from '../lib/image-policy'
 
 // ─── Shared design tokens ────────────────────────────────────────────────────
 export const C = {
@@ -164,13 +167,17 @@ export function ImageUpload({
   onChange,
   recommended,
   aspect = 'landscape',
+  imageKind,
 }: {
   value: string
   onChange: (v: string) => void
   recommended: string
   aspect?: 'landscape' | 'square' | 'portrait'
+  imageKind: ImageKind
 }) {
   const [uploading, setUploading] = useState(false)
+  const [preparing, setPreparing] = useState(false)
+  const [uploadError, setUploadError] = useState('')
 
   const previewStyles: Record<string, CSSProperties> = {
     landscape: { width: '100%', maxWidth: 320, height: 140 },
@@ -179,25 +186,32 @@ export function ImageUpload({
   }
 
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    if (file.size > 8 * 1024 * 1024) {
-      alert('La imagen supera los 8 MB. Reducí el tamaño antes de subir.')
-      return
-    }
+    const input = e.currentTarget
+    const file = input.files?.[0]
+    if (!file || uploading) return
     setUploading(true)
+    setPreparing(true)
+    setUploadError('')
     try {
-      const ext = file.name.split('.').pop()
-      const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
-      const { error } = await supabase.storage.from('narom-images').upload(path, file, { upsert: true })
+      const prepared = await prepareImage(file, imageKind)
+      assertPreparedImage(prepared, imageKind)
+      setPreparing(false)
+      const ext = prepared.type === 'image/webp' ? 'webp' : prepared.type === 'image/png' ? 'png' : 'jpg'
+      const path = `optimized-v1-${imageKind}-${crypto.randomUUID()}.${ext}`
+      const { error } = await supabase.storage.from('narom-images').upload(path, prepared, {
+        contentType: prepared.type,
+        cacheControl: '31536000',
+        upsert: false,
+      })
       if (error) throw error
       const { data } = supabase.storage.from('narom-images').getPublicUrl(path)
       onChange(data.publicUrl)
     } catch (err) {
-      alert('Error al subir la imagen. Intentá de nuevo.')
-      console.error(err)
+      setUploadError(err instanceof Error ? err.message : 'Error al subir la imagen. Intentá de nuevo.')
     } finally {
       setUploading(false)
+      setPreparing(false)
+      input.value = ''
     }
   }
 
@@ -235,7 +249,9 @@ export function ImageUpload({
         }}
       >
         {uploading ? (
-          <span style={{ fontSize: 13, color: C.amber, fontWeight: 600 }}>Subiendo imagen…</span>
+          <span role="status" style={{ fontSize: 13, color: C.amber, fontWeight: 600 }}>
+            {preparing ? 'Preparando imagen…' : 'Subiendo imagen…'}
+          </span>
         ) : (
           <>
             <svg width="28" height="28" fill="none" stroke={C.muted} strokeWidth={1.5} viewBox="0 0 24 24">
@@ -248,10 +264,15 @@ export function ImageUpload({
         <input
           type="file"
           accept="image/jpeg,image/png,image/webp"
+          disabled={uploading}
           onChange={handleFile}
           style={{ display: 'none' }}
         />
       </label>
+      <p style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>
+        El tamaño y el peso se ajustan automáticamente al subir.
+      </p>
+      {uploadError && <p role="alert" style={{ color: '#b91c1c', fontSize: 13, marginTop: 8 }}>{uploadError}</p>}
 
       {/* Preview */}
       {value && (

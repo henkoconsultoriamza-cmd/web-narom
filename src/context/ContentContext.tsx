@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, useRef, type ReactNode } from 'react'
 import { brands as defaultBrands } from '../data/brands'
 import { promos as defaultPromos } from '../data/promos'
 import { top10 as defaultProducts } from '../data/products'
@@ -93,6 +93,8 @@ const ContentContext = createContext<Ctx | null>(null)
 export function ContentProvider({ children }: { children: ReactNode }) {
   const [content, setContent] = useState<SiteContent>(defaultContent)
   const [loading, setLoading] = useState(true)
+  const currentContent = useRef<SiteContent>(defaultContent)
+  const saveQueue = useRef<Promise<void>>(Promise.resolve())
 
   useEffect(() => {
     async function fetchContent() {
@@ -103,24 +105,34 @@ export function ContentProvider({ children }: { children: ReactNode }) {
         .single()
 
       if (!error && data?.data && Object.keys(data.data).length > 0) {
-        setContent(mergeWithDefaults(data.data as Partial<SiteContent>))
+        const loaded = mergeWithDefaults(data.data as Partial<SiteContent>)
+        currentContent.current = loaded
+        setContent(loaded)
       }
       setLoading(false)
     }
     fetchContent()
   }, [])
 
-  async function save(partial: Partial<SiteContent>) {
-    const next = {
-      ...content,
-      ...partial,
-      about: { ...content.about, ...(partial.about ?? {}) },
-      contact: { ...content.contact, ...(partial.contact ?? {}) },
-    }
-    setContent(next)
-    await supabase
-      .from('site_content')
-      .upsert({ id: SUPABASE_ROW, data: next, updated_at: new Date().toISOString() })
+  function save(partial: Partial<SiteContent>): Promise<void> {
+    // Serialize saves so a slower previous request cannot overwrite a new image.
+    const operation = saveQueue.current.catch(() => undefined).then(async () => {
+      const current = currentContent.current
+      const next = {
+        ...current,
+        ...partial,
+        about: { ...current.about, ...(partial.about ?? {}) },
+        contact: { ...current.contact, ...(partial.contact ?? {}) },
+      }
+      const { error } = await supabase
+        .from('site_content')
+        .upsert({ id: SUPABASE_ROW, data: next, updated_at: new Date().toISOString() })
+      if (error) throw error
+      currentContent.current = next
+      setContent(next)
+    })
+    saveQueue.current = operation
+    return operation
   }
 
   return (

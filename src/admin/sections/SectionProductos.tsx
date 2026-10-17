@@ -34,7 +34,11 @@ export default function SectionProductos({ onSave }: { onSave: (msg: string) => 
   useEffect(() => {
     if (!mounted.current) { mounted.current = true; return }
     clearTimeout(timer.current)
-    timer.current = setTimeout(() => { save({ products }); onSave('Productos guardados') }, 1500)
+    timer.current = setTimeout(() => {
+      save({ products })
+        .then(() => onSave('Productos guardados'))
+        .catch(() => onSave('No se pudo guardar. Volv? a intentar.'))
+    }, 1500)
     return () => clearTimeout(timer.current)
   }, [JSON.stringify(products)])
 
@@ -88,6 +92,7 @@ export default function SectionProductos({ onSave }: { onSave: (msg: string) => 
           <AdminField label="Imagen del producto">
             <ImageUpload
               value={product.image}
+              imageKind="product"
               onChange={v => update(i, 'image', v)}
               recommended="400 × 400 px (cuadrada)"
               aspect="square"

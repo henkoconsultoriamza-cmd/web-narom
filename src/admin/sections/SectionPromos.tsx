@@ -32,7 +32,11 @@ export default function SectionPromos({ onSave }: { onSave: (msg: string) => voi
   useEffect(() => {
     if (!mounted.current) { mounted.current = true; return }
     clearTimeout(timer.current)
-    timer.current = setTimeout(() => { save({ promos }); onSave('Promociones guardadas') }, 1500)
+    timer.current = setTimeout(() => {
+      save({ promos })
+        .then(() => onSave('Promociones guardadas'))
+        .catch(() => onSave('No se pudo guardar. Volv? a intentar.'))
+    }, 1500)
     return () => clearTimeout(timer.current)
   }, [JSON.stringify(promos)])
 
@@ -72,6 +76,7 @@ export default function SectionPromos({ onSave }: { onSave: (msg: string) => voi
           <AdminField label="Imagen desktop" hint="1200 × 600 px, panorámica horizontal">
             <ImageUpload
               value={promo.image}
+              imageKind="banner"
               onChange={v => update(i, 'image', v)}
               recommended="1200 × 600 px"
               aspect="landscape"
@@ -81,6 +86,7 @@ export default function SectionPromos({ onSave }: { onSave: (msg: string) => voi
           <AdminField label="Imagen mobile (opcional)" hint="800 × 900 px, más cuadrada. Si no subís, usa la de desktop">
             <ImageUpload
               value={promo.imageMobile ?? ''}
+              imageKind="bannerMobile"
               onChange={v => update(i, 'imageMobile', v)}
               recommended="800 × 900 px"
               aspect="portrait"

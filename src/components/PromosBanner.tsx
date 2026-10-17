@@ -1,7 +1,10 @@
+import { useState } from 'react'
 import { Swiper, SwiperSlide } from 'swiper/react'
 import { Autoplay, Navigation, Pagination, EffectFade } from 'swiper/modules'
 import { motion } from 'framer-motion'
 import { useContent } from '../context/ContentContext'
+import { getPromoImageSources } from '../lib/images'
+import type { Promo } from '../data/promos'
 
 // @ts-ignore
 import 'swiper/css'
@@ -12,10 +15,39 @@ import 'swiper/css/pagination'
 // @ts-ignore
 import 'swiper/css/effect-fade'
 
+function PromoImage({ promo, current }: { promo: Promo; current: boolean }) {
+  const [useOriginal, setUseOriginal] = useState(false)
+  const desktop = useOriginal
+    ? { src: promo.image, srcSet: undefined }
+    : getPromoImageSources(promo.image, 'desktop')
+  const mobileSrc = promo.imageMobile || promo.image
+  const mobile = useOriginal
+    ? { src: mobileSrc, srcSet: undefined }
+    : getPromoImageSources(mobileSrc, 'mobile')
+
+  return (
+    <picture className="absolute inset-0 w-full h-full">
+      {mobile && (
+        <source media="(max-width: 639px)" srcSet={mobile.srcSet ?? mobile.src} sizes="100vw" />
+      )}
+      <img
+        src={desktop.src}
+        srcSet={desktop.srcSet}
+        sizes="100vw"
+        alt={promo.title}
+        decoding="async"
+        fetchPriority={current ? 'high' : 'low'}
+        onError={useOriginal ? undefined : () => setUseOriginal(true)}
+        className="w-full h-full object-cover object-center transition-transform duration-[1.4s] group-hover:scale-105"
+      />
+    </picture>
+  )
+}
 
 export default function PromosBanner() {
-  const { content } = useContent()
-  const { promos } = content
+  const { content, loading } = useContent()
+  const [activeIndex, setActiveIndex] = useState(0)
+  const promos = content.promos.filter(promo => promo.active)
   const wa = content.contact.whatsapp
 
   return (
@@ -38,39 +70,41 @@ export default function PromosBanner() {
       </div>
 
       {/* Slider full width */}
-      <motion.div
-        initial={{ opacity: 0, y: 40 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true }}
-        transition={{ duration: 0.7 }}
-      >
+      <div>
+      {loading ? (
+        <div
+          role="status"
+          aria-label="Cargando promociones"
+          style={{ height: 'calc(clamp(420px, 55vw, 500px) + 40px)' }}
+        />
+      ) : promos.length > 0 ? (
       <Swiper
         modules={[Autoplay, Navigation, Pagination, EffectFade]}
         effect="fade"
         fadeEffect={{ crossFade: true }}
         slidesPerView={1}
-        loop
-        autoplay={{ delay: 4500, disableOnInteraction: false }}
+        loop={promos.length > 1}
+        autoplay={promos.length > 1 ? { delay: 4500, disableOnInteraction: false } : false}
+        onSlideChange={swiper => setActiveIndex(swiper.realIndex)}
         navigation
         pagination={{ clickable: true }}
         style={{ width: '100%', paddingBottom: '40px' }}
       >
-        {promos.filter(p => p.active).map(promo => (
+        {promos.map((promo, index) => (
           <SwiperSlide key={promo.id} style={{ width: '100%' }}>
             <div
               className="relative w-full overflow-hidden"
               style={{ height: 'clamp(420px, 55vw, 500px)' }}
             >
-              <picture className="absolute inset-0 w-full h-full">
-                {promo.imageMobile && (
-                  <source media="(max-width: 639px)" srcSet={promo.imageMobile} />
-                )}
-                <img
-                  src={promo.image}
-                  alt={promo.title}
-                  className="w-full h-full object-cover object-center transition-transform duration-[1.4s] group-hover:scale-105"
+              {/* Keep optimized slides mounted and ready to display. Autoplay
+                  keeps its normal speed; no slide waits for an image request. */}
+              {promo.image && (
+                <PromoImage
+                  key={`${promo.image}|${promo.imageMobile ?? ''}`}
+                  promo={promo}
+                  current={index === activeIndex}
                 />
-              </picture>
+              )}
               <div className="absolute inset-0" style={{ background: 'rgba(2,21,44,0.25)' }} />
               <div className="absolute bottom-6 left-8">
                 <a
@@ -89,7 +123,8 @@ export default function PromosBanner() {
           </SwiperSlide>
         ))}
       </Swiper>
-      </motion.div>
+      ) : null}
+      </div>
     </section>
   )
 }

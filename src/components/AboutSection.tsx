@@ -1,6 +1,7 @@
 import { motion, useInView } from 'framer-motion'
 import { useEffect, useRef, useState } from 'react'
 import { useContent } from '../context/ContentContext'
+import OptimizedImage from './OptimizedImage'
 
 interface StatProps { value: number; label: string; suffix?: string }
 
@@ -75,8 +76,10 @@ export default function AboutSection() {
             className="relative rounded-2xl overflow-hidden"
             style={{ height: '380px' }}
           >
-            <img
+            <OptimizedImage
               src={about.depotImage}
+              profile="company"
+              sizes="(min-width: 1024px) 50vw, 100vw"
               alt="Depósito Narom Group"
               className="w-full h-full object-cover"
             />

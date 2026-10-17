@@ -2,6 +2,7 @@ import { motion } from 'framer-motion'
 import { useState } from 'react'
 import { useContent } from '../context/ContentContext'
 import type { Brand } from '../data/brands'
+import OptimizedImage from './OptimizedImage'
 
 function BrandLogo({ brand, isRight }: { brand: Brand; isRight: boolean }) {
   const [failed, setFailed] = useState(false)
@@ -16,8 +17,10 @@ function BrandLogo({ brand, isRight }: { brand: Brand; isRight: boolean }) {
           padding: brand.logoBg ? '8px 14px' : 0,
           display: 'inline-flex',
         }}>
-          <img
+          <OptimizedImage
             src={brand.logoFile}
+            profile="logo"
+            sizes="220px"
             alt={brand.name}
             onError={() => setFailed(true)}
             className="object-contain"
@@ -100,8 +103,9 @@ export default function BrandsSection() {
                 </div>
               )}
 
-              <img
+              <OptimizedImage
                 src={brand.situationalImage}
+                profile="desktop"
                 alt={brand.name}
                 className="brand-bg-img absolute inset-0 w-full h-full object-cover transition-transform duration-[1.4s] group-hover:scale-105"
                 style={{

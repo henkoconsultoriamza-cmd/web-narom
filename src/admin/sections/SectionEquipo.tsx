@@ -31,7 +31,11 @@ export default function SectionEquipo({ onSave }: { onSave: (msg: string) => voi
   useEffect(() => {
     if (!mounted.current) { mounted.current = true; return }
     clearTimeout(timer.current)
-    timer.current = setTimeout(() => { save({ team }); onSave('Equipo guardado') }, 1500)
+    timer.current = setTimeout(() => {
+      save({ team })
+        .then(() => onSave('Equipo guardado'))
+        .catch(() => onSave('No se pudo guardar. Volv? a intentar.'))
+    }, 1500)
     return () => clearTimeout(timer.current)
   }, [JSON.stringify(team)])
 
@@ -78,6 +82,7 @@ export default function SectionEquipo({ onSave }: { onSave: (msg: string) => voi
           <AdminField label="Foto de perfil" hint="Se muestra recortada en círculo. Fondo neutro preferentemente.">
             <ImageUpload
               value={member.foto}
+              imageKind="portrait"
               onChange={v => update(i, 'foto', v)}
               recommended="400 × 400 px (cuadrada, cara centrada)"
               aspect="square"
