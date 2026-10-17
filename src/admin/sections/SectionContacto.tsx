@@ -14,7 +14,7 @@ export default function SectionContacto({ onSave }: { onSave: (msg: string) => v
     timer.current = setTimeout(() => {
       save({ contact: form })
         .then(() => onSave('Contacto guardado'))
-        .catch(() => onSave('No se pudo guardar. Volv? a intentar.'))
+        .catch(() => onSave('No se pudo guardar. Volvé a intentar.'))
     }, 1500)
     return () => clearTimeout(timer.current)
   }, [JSON.stringify(form)])

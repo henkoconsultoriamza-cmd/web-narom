@@ -22,7 +22,7 @@ export default function SectionMarcas({ onSave }: { onSave: (msg: string) => voi
     timer.current = setTimeout(() => {
       save({ brands })
         .then(() => onSave('Marcas guardadas'))
-        .catch(() => onSave('No se pudo guardar. Volv? a intentar.'))
+        .catch(() => onSave('No se pudo guardar. Volvé a intentar.'))
     }, 1500)
     return () => clearTimeout(timer.current)
   }, [JSON.stringify(brands)])

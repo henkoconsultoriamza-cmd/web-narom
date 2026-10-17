@@ -34,7 +34,7 @@ export default function SectionEquipo({ onSave }: { onSave: (msg: string) => voi
     timer.current = setTimeout(() => {
       save({ team })
         .then(() => onSave('Equipo guardado'))
-        .catch(() => onSave('No se pudo guardar. Volv? a intentar.'))
+        .catch(() => onSave('No se pudo guardar. Volvé a intentar.'))
     }, 1500)
     return () => clearTimeout(timer.current)
   }, [JSON.stringify(team)])

@@ -35,7 +35,7 @@ export default function SectionPromos({ onSave }: { onSave: (msg: string) => voi
     timer.current = setTimeout(() => {
       save({ promos })
         .then(() => onSave('Promociones guardadas'))
-        .catch(() => onSave('No se pudo guardar. Volv? a intentar.'))
+        .catch(() => onSave('No se pudo guardar. Volvé a intentar.'))
     }, 1500)
     return () => clearTimeout(timer.current)
   }, [JSON.stringify(promos)])

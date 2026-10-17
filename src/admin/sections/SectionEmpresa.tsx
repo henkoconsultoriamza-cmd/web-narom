@@ -35,7 +35,7 @@ export default function SectionEmpresa({ onSave }: { onSave: (msg: string) => vo
     timer.current = setTimeout(() => {
       save({ about })
         .then(() => onSave('Empresa guardada'))
-        .catch(() => onSave('No se pudo guardar. Volv? a intentar.'))
+        .catch(() => onSave('No se pudo guardar. Volvé a intentar.'))
     }, 1500)
     return () => clearTimeout(timer.current)
   }, [JSON.stringify(about)])

@@ -37,7 +37,7 @@ export default function SectionProductos({ onSave }: { onSave: (msg: string) => 
     timer.current = setTimeout(() => {
       save({ products })
         .then(() => onSave('Productos guardados'))
-        .catch(() => onSave('No se pudo guardar. Volv? a intentar.'))
+        .catch(() => onSave('No se pudo guardar. Volvé a intentar.'))
     }, 1500)
     return () => clearTimeout(timer.current)
   }, [JSON.stringify(products)])
